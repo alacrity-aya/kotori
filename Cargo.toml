@@ -1,0 +1,14 @@
+[package]
+name = "kotori"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow = "1.0"
+ctrlc = { version = "3.4", features = ["termination"] }
+libc = "0.2"
+libbpf-rs = "0.24"
+structopt = "0.3"
+
+[build-dependencies]
+libbpf-cargo = "0.24"
