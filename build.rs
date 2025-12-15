@@ -14,6 +14,8 @@ fn main() {
         PathBuf::from(env::var_os("OUT_DIR").expect("OUT_DIR must be set in build script"));
     out.push("lb.skel.rs");
 
+    // let _ = Command::new("rm").arg(VMLINUX).status();
+
     Command::new("bpftool")
         .arg("btf")
         .arg("dump")
