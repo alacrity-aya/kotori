@@ -7,8 +7,9 @@ edition = "2024"
 anyhow = "1.0"
 ctrlc = { version = "3.4", features = ["termination"] }
 libc = "0.2"
-libbpf-rs = "0.24"
+libbpf-rs = "0.25"
 structopt = "0.3"
+clap = { version = "4.5.53", features = ["derive"] }
 
 [build-dependencies]
-libbpf-cargo = "0.24"
+libbpf-cargo = "0.25"

@@ -2,9 +2,10 @@ mod lb {
     include!(concat!(env!("OUT_DIR"), "/lb.skel.rs"));
 }
 
-mod vip;
+mod cli;
 
 use core::time;
+use std::fs;
 use std::fs::File;
 use std::io;
 use std::io::Write;
@@ -19,6 +20,7 @@ use std::thread;
 use anyhow::Ok;
 use anyhow::Result;
 use anyhow::bail;
+use clap::Parser;
 use lb::*;
 use libbpf_rs::skel::OpenSkel;
 use libbpf_rs::skel::SkelBuilder;
@@ -39,6 +41,10 @@ fn bump_memlock_rlimit() -> Result<()> {
 }
 
 fn main() -> Result<()> {
+    let cli = cli::Cli::parse();
+
+    dbg!(cli);
+
     bump_memlock_rlimit()?;
 
     let skel_builder = LbSkelBuilder::default();
