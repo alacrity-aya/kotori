@@ -1,3 +1,2 @@
-<div align="center">          
-    <img src="assert/kotori.png" alt="kotori CG">
-</div>
+## Kotori 
+An easy-to-use load balancer based on ebpf
