@@ -3,19 +3,18 @@ mod lb {
 }
 
 mod cli;
+mod config;
 
 use core::time;
-use std::fs;
 use std::fs::File;
-use std::io;
-use std::io::Write;
 use std::mem::MaybeUninit;
 use std::os::fd::AsFd;
-use std::os::fd::AsRawFd;
-use std::sync::Arc;
-use std::sync::atomic::AtomicBool;
-use std::sync::atomic::Ordering;
-use std::thread;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
+use std::{io, thread};
+use std::{os::fd::AsRawFd, process};
 
 use anyhow::Ok;
 use anyhow::Result;
@@ -41,9 +40,17 @@ fn bump_memlock_rlimit() -> Result<()> {
 }
 
 fn main() -> Result<()> {
-    let cli = cli::Cli::parse();
+    // root permissions are required
+    let euid = unsafe { libc::geteuid() };
+    if euid != 0 {
+        eprintln!("Please run this executable with 'sudo' or as root.");
+        process::exit(1);
+    }
 
-    dbg!(cli);
+    let cli = cli::Cli::parse();
+    dbg!(&cli);
+
+    cli.validate_args()?;
 
     bump_memlock_rlimit()?;
 
@@ -73,7 +80,7 @@ fn main() -> Result<()> {
     print!("ebpf program is running");
     while running.load(Ordering::SeqCst) {
         print!(".");
-        io::stdout().flush()?;
+        io::Write::flush(&mut io::stdout())?;
         thread::sleep(time::Duration::from_secs(1));
     }
 

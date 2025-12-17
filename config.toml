@@ -1,0 +1,29 @@
+[[vip]]
+name = "web-80"
+addr = "10.0.0.100"
+port = 80
+proto = "tcp"
+
+[vip.lb]
+mode = "hash"
+
+[vip.lb.hash]
+key = "src_ip"
+
+[[vip.rip]]
+addr = "192.168.1.10"
+port = 8080
+w = 1
+
+[[vip.rip]]
+addr = "192.168.1.11"
+port = 8080
+w = 2
+
+[vip.stat]
+enable = true
+
+[vip.stat.out]
+fmt = "json"
+path = "/var/log/lb/web-80.stat"
+interval = 10

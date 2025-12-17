@@ -26,18 +26,16 @@ pub struct Cli {
 }
 
 impl Cli {
-    fn validate_args(&self) -> Result<()> {
-        if !fs::exists(&self.config).unwrap_or(true) {
+    pub fn validate_args(&self) -> Result<()> {
+        if !fs::exists(&self.config).unwrap_or(false) {
             bail!(
                 "Configuration file not found or inaccessible: {}",
                 self.config
             );
         }
 
-        let path_opt = self.path.clone();
-
-        if let Some(path) = path_opt
-            && !fs::exists(&self.config).unwrap_or(true)
+        if let Some(path) = &self.path
+            && !fs::exists(path).unwrap_or(false)
         {
             bail!("Output path not found or inaccessible: {}", path);
         }
