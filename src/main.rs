@@ -5,7 +5,9 @@ mod lb {
 mod cli;
 mod config;
 
+use config::Config;
 use core::time;
+use lb::*;
 use std::fs::File;
 use std::mem::MaybeUninit;
 use std::os::fd::AsFd;
@@ -20,9 +22,9 @@ use anyhow::Ok;
 use anyhow::Result;
 use anyhow::bail;
 use clap::Parser;
-use lb::*;
 use libbpf_rs::skel::OpenSkel;
 use libbpf_rs::skel::SkelBuilder;
+use log::debug;
 
 const CGROUP_PATH: &str = "/sys/fs/cgroup";
 
@@ -47,10 +49,15 @@ fn main() -> Result<()> {
         process::exit(1);
     }
 
-    let cli = cli::Cli::parse();
-    dbg!(&cli);
+    env_logger::init();
 
+    let cli = cli::Cli::parse();
+    debug!("{cli:?}");
     cli.validate_args()?;
+    let config = Config::new(cli.config)?;
+    config.validate()?;
+
+    debug!("{config:?}");
 
     bump_memlock_rlimit()?;
 

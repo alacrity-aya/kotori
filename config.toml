@@ -21,9 +21,9 @@ port = 8080
 w = 2
 
 [vip.stat]
-enable = true
+enable = false
 
-[vip.stat.out]
-fmt = "json"
-path = "/var/log/lb/web-80.stat"
-interval = 10
+# [vip.stat.out]
+# fmt = "json"
+# path = "/var/log/lb/web-80.stat"
+# interval = 10
