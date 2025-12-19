@@ -2,7 +2,7 @@ use anyhow::anyhow;
 use core::net;
 use std::{collections::HashSet, fs};
 
-use anyhow::{Error, Result, bail};
+use anyhow::{Result, bail};
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]

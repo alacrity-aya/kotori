@@ -4,42 +4,17 @@ mod lb {
 
 mod cli;
 mod config;
+mod ebpf;
 
 use config::Config;
-use core::time;
-use lb::*;
-use std::fs::File;
-use std::mem::MaybeUninit;
-use std::os::fd::AsFd;
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
-use std::{io, thread};
-use std::{os::fd::AsRawFd, process};
+use std::process;
 
 use anyhow::Ok;
 use anyhow::Result;
-use anyhow::bail;
 use clap::Parser;
-use libbpf_rs::skel::OpenSkel;
-use libbpf_rs::skel::SkelBuilder;
 use log::debug;
 
-const CGROUP_PATH: &str = "/sys/fs/cgroup";
-
-fn bump_memlock_rlimit() -> Result<()> {
-    let rlimit = libc::rlimit {
-        rlim_cur: 128 << 20,
-        rlim_max: 128 << 20,
-    };
-
-    if unsafe { libc::setrlimit(libc::RLIMIT_MEMLOCK, &rlimit) } != 0 {
-        bail!("Failed to increase rlimit");
-    }
-
-    Ok(())
-}
+use crate::ebpf::load_ebpf_prog;
 
 fn main() -> Result<()> {
     // root permissions are required
@@ -56,42 +31,9 @@ fn main() -> Result<()> {
     cli.validate_args()?;
     let config = Config::new(cli.config)?;
     config.validate()?;
-
     debug!("{config:?}");
 
-    bump_memlock_rlimit()?;
-
-    let skel_builder = LbSkelBuilder::default();
-    let mut open_object = MaybeUninit::uninit();
-    let mut skel = skel_builder.open(&mut open_object)?.load()?;
-
-    let cgroup_file = File::open(CGROUP_PATH)?;
-    let cgroup_fd = cgroup_file.as_fd();
-
-    let link = skel
-        .progs
-        .load_balance
-        .attach_cgroup(cgroup_fd.as_raw_fd())?;
-
-    skel.links = LbLinks {
-        load_balance: Some(link),
-    };
-
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-
-    ctrlc::set_handler(move || {
-        r.store(false, Ordering::SeqCst);
-    })?;
-
-    print!("ebpf program is running");
-    while running.load(Ordering::SeqCst) {
-        print!(".");
-        io::Write::flush(&mut io::stdout())?;
-        thread::sleep(time::Duration::from_secs(1));
-    }
-
-    println!("\nreceive SIGINT, exit");
+    load_ebpf_prog()?;
 
     Ok(())
 }

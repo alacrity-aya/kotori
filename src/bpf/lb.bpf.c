@@ -6,7 +6,7 @@
 
 struct real_nodes {
   __u32 size;
-  __be32 ip_addrs[MAX_BACKEND_NUMBER];
+  __be32 rips[MAX_BACKEND_NUMBER];
 };
 
 struct {
@@ -16,13 +16,6 @@ struct {
   __type(value, struct real_nodes);
 } ip_map SEC(".maps");
 
-struct {
-  __uint(type, BPF_MAP_TYPE_HASH);
-  __uint(max_entries, 1024);
-  __type(key, __be32); // virtual ip address
-  __type(value, __u8); // 0 -> no element
-} ip_table SEC(".maps");
-
 #define PASS 1
 #define DROP 0
 
@@ -30,7 +23,7 @@ struct {
 #define AF_INET 2
 
 __always_inline void load_banalce_impl(struct bpf_sock_addr *sk, __u32 size,
-                                       __be32 *ip_addrs) {
+                                       __be32 *rips) {
 
   bpf_printk("%s remains to be done\n", __func__);
   return;
@@ -42,26 +35,21 @@ int load_balance(struct bpf_sock_addr *sk) {
     return PASS;
   }
 
-  __be32 virtual_ip = sk->user_ip4;
-  __u8 *exist = bpf_map_lookup_elem(&ip_table, &virtual_ip);
+  __be32 vip = sk->user_ip4;
 
-  if (exist == NULL || *exist == 0) {
-    return PASS;
-  }
-
-  struct real_nodes *node = bpf_map_lookup_elem(&ip_map, &virtual_ip);
+  struct real_nodes *node = bpf_map_lookup_elem(&ip_map, &vip);
   if (node == NULL) {
     return PASS;
   }
 
   __u32 size = node->size;
-  __be32 *ip_addrs = node->ip_addrs;
+  __be32 *rips = node->rips;
 
   if (size == 0) {
     return PASS;
   }
 
-  load_banalce_impl(sk, size, ip_addrs);
+  load_banalce_impl(sk, size, rips);
 
   return PASS;
 }
