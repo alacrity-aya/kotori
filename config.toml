@@ -1,6 +1,6 @@
 [[vip]]
 name = "web-80"
-addr = "10.0.0.100"
+addr = "10.0.0.1"
 port = 80
 proto = "tcp"
 

@@ -1,7 +1,10 @@
+use crate::config;
 use crate::lb::*;
+use core::slice;
 use core::time;
 use std::fs::File;
 use std::mem::MaybeUninit;
+use std::net::IpAddr;
 use std::os::fd::AsFd;
 use std::os::fd::AsRawFd;
 use std::sync::{
@@ -13,8 +16,11 @@ use std::{io, thread};
 use anyhow::Ok;
 use anyhow::Result;
 use anyhow::bail;
+use libbpf_rs::MapCore;
+use libbpf_rs::MapFlags;
 use libbpf_rs::skel::OpenSkel;
 use libbpf_rs::skel::SkelBuilder;
+use log::debug;
 
 const CGROUP_PATH: &str = "/sys/fs/cgroup";
 
@@ -31,7 +37,57 @@ fn bump_memlock_rlimit() -> Result<()> {
     Ok(())
 }
 
-pub fn load_ebpf_prog() -> Result<()> {
+fn wait_signal() -> Result<()> {
+    let running = Arc::new(AtomicBool::new(true));
+    let r = running.clone();
+
+    ctrlc::set_handler(move || {
+        r.store(false, Ordering::SeqCst);
+    })?;
+
+    print!("ebpf program is running, press 'ctrl + c' to exit");
+    while running.load(Ordering::SeqCst) {
+        print!(".");
+        io::Write::flush(&mut io::stdout())?;
+        thread::sleep(time::Duration::from_secs(1));
+    }
+
+    println!("\nreceive SIGINT, exit");
+    Ok(())
+}
+
+fn insert_rules(config: &config::Config, skel: LbSkel) -> Result<()> {
+    for vip in &config.vip {
+        let key = match vip.addr {
+            IpAddr::V4(v4) => v4.to_bits().to_be().to_ne_bytes(),
+            IpAddr::V6(_) => bail!("IPv6 not supported yet"),
+        };
+
+        let mut rips = [0; 1024];
+
+        for (i, rip) in vip.rip.iter().enumerate() {
+            let rip_be32 = match rip.addr {
+                IpAddr::V4(v4) => v4.to_bits().to_be(),
+                IpAddr::V6(_) => bail!("IPv6 not supported yet"),
+            };
+            rips[i] = rip_be32;
+        }
+
+        let value = types::backends {
+            size: std::cmp::min(vip.rip.len(), 1024) as u32,
+            rips,
+        };
+
+        let value_ptr = &value as *const types::backends as *const u8;
+        let value_silce =
+            unsafe { slice::from_raw_parts(value_ptr, std::mem::size_of::<types::backends>()) };
+
+        skel.maps.ip_map.update(&key, value_silce, MapFlags::ANY)?;
+    }
+    Ok(())
+}
+
+pub fn load_ebpf_prog(config: &config::Config) -> Result<()> {
     bump_memlock_rlimit()?;
 
     let skel_builder = LbSkelBuilder::default();
@@ -50,21 +106,6 @@ pub fn load_ebpf_prog() -> Result<()> {
         load_balance: Some(link),
     };
 
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-
-    ctrlc::set_handler(move || {
-        r.store(false, Ordering::SeqCst);
-    })?;
-
-    print!("ebpf program is running");
-    while running.load(Ordering::SeqCst) {
-        print!(".");
-        io::Write::flush(&mut io::stdout())?;
-        thread::sleep(time::Duration::from_secs(1));
-    }
-
-    println!("\nreceive SIGINT, exit");
-
-    Ok(())
+    insert_rules(config, skel)?;
+    wait_signal()
 }

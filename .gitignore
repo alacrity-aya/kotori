@@ -1,3 +1,4 @@
 /target
 /src/bpf/vmlinux.h
 /.cargo
+/*.sh

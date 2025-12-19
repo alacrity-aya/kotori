@@ -12,9 +12,6 @@ use std::process;
 use anyhow::Ok;
 use anyhow::Result;
 use clap::Parser;
-use log::debug;
-
-use crate::ebpf::load_ebpf_prog;
 
 fn main() -> Result<()> {
     // root permissions are required
@@ -27,13 +24,11 @@ fn main() -> Result<()> {
     env_logger::init();
 
     let cli = cli::Cli::parse();
-    debug!("{cli:?}");
     cli.validate_args()?;
     let config = Config::new(cli.config)?;
     config.validate()?;
-    debug!("{config:?}");
 
-    load_ebpf_prog()?;
+    ebpf::load_ebpf_prog(&config)?;
 
     Ok(())
 }
