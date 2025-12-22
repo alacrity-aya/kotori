@@ -56,21 +56,21 @@ fn wait_signal() -> Result<()> {
     Ok(())
 }
 
-fn insert_rules(config: &config::Config, skel: LbSkel) -> Result<()> {
+fn insert_rules(config: &config::Config, skel: &LbSkel) -> Result<()> {
     for vip in &config.vip {
         let key = match vip.addr {
-            IpAddr::V4(v4) => v4.to_bits().to_be().to_ne_bytes(),
+            IpAddr::V4(v4) => v4.octets(),
             IpAddr::V6(_) => bail!("IPv6 not supported yet"),
         };
 
         let mut rips = [0; 1024];
 
         for (i, rip) in vip.rip.iter().enumerate() {
-            let rip_be32 = match rip.addr {
-                IpAddr::V4(v4) => v4.to_bits().to_be(),
-                IpAddr::V6(_) => bail!("IPv6 not supported yet"),
-            };
-            rips[i] = rip_be32;
+            if let IpAddr::V4(v4) = rip.addr {
+                let octets = v4.octets();
+                let be_u32 = u32::from_be_bytes(octets);
+                rips[i] = be_u32;
+            }
         }
 
         let value = types::backends {
@@ -106,6 +106,6 @@ pub fn load_ebpf_prog(config: &config::Config) -> Result<()> {
         load_balance: Some(link),
     };
 
-    insert_rules(config, skel)?;
+    insert_rules(config, &skel)?;
     wait_signal()
 }
