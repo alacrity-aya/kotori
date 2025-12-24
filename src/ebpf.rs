@@ -68,7 +68,7 @@ fn insert_rules(config: &config::Config, skel: &LbSkel) -> Result<()> {
         for (i, rip) in vip.rip.iter().enumerate() {
             if let IpAddr::V4(v4) = rip.addr {
                 let octets = v4.octets();
-                let be_u32 = u32::from_be_bytes(octets);
+                let be_u32 = u32::from_ne_bytes(octets);
                 rips[i] = be_u32;
             }
         }

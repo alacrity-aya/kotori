@@ -2,3 +2,5 @@
 /src/bpf/vmlinux.h
 /.cargo
 /*.sh
+/*.log
+
