@@ -1,3 +1,7 @@
+[workspace]
+
+members = [".", "tests/backends"]
+
 [package]
 name = "kotori"
 version = "0.1.0"
