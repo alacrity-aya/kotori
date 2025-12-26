@@ -1,4 +1,6 @@
 use crate::config;
+use crate::lb::types::backends;
+use crate::lb::types::endpoint;
 use crate::lb::*;
 use core::slice;
 use core::time;
@@ -20,9 +22,9 @@ use libbpf_rs::MapCore;
 use libbpf_rs::MapFlags;
 use libbpf_rs::skel::OpenSkel;
 use libbpf_rs::skel::SkelBuilder;
-use log::debug;
 
 const CGROUP_PATH: &str = "/sys/fs/cgroup";
+const MAX_BACKEND_NUMBER: usize = 512;
 
 fn bump_memlock_rlimit() -> Result<()> {
     let rlimit = libc::rlimit {
@@ -63,19 +65,22 @@ fn insert_rules(config: &config::Config, skel: &LbSkel) -> Result<()> {
             IpAddr::V6(_) => bail!("IPv6 not supported yet"),
         };
 
-        let mut rips = [0; 1024];
+        let mut endpoints: [endpoint; MAX_BACKEND_NUMBER] =
+            [Default::default(); MAX_BACKEND_NUMBER];
 
         for (i, rip) in vip.rip.iter().enumerate() {
             if let IpAddr::V4(v4) = rip.addr {
                 let octets = v4.octets();
-                let be_u32 = u32::from_ne_bytes(octets);
-                rips[i] = be_u32;
+                let rip = u32::from_ne_bytes(octets);
+                endpoints[i].rip = rip;
             }
+
+            endpoints[i].ports = rip.port;
         }
 
-        let value = types::backends {
-            size: std::cmp::min(vip.rip.len(), 1024) as u32,
-            rips,
+        let value = backends {
+            size: std::cmp::min(vip.rip.len(), MAX_BACKEND_NUMBER) as u32,
+            endpoints,
         };
 
         let value_ptr = &value as *const types::backends as *const u8;

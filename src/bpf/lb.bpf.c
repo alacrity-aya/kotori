@@ -3,11 +3,16 @@
 #include <bpf/bpf_endian.h>
 #include <bpf/bpf_helpers.h>
 
-#define MAX_BACKEND_NUMBER 1024
+#define MAX_BACKEND_NUMBER 512
+
+struct endpoint {
+  __u32 rip;
+  __u32 ports;
+};
 
 struct backends {
   __u32 size;
-  __be32 rips[MAX_BACKEND_NUMBER];
+  struct endpoint endpoints[MAX_BACKEND_NUMBER];
 };
 
 struct {
@@ -22,18 +27,14 @@ struct {
 
 #define AF_INET 2
 
-#define barrier_var(var) asm volatile("" : "+r"(var))
+static __always_inline __u32 get_bucket_index(__u32 size) {
+  __u32 random = bpf_get_prandom_u32();
 
-__always_inline void load_banalce_impl(struct bpf_sock_addr *sk, __u32 size,
-                                       __be32 *rips) {
-  __u32 random_index = bpf_get_prandom_u32();
-  random_index %= size;
-  barrier_var(random_index); // make verifier happy
-  random_index &= (MAX_BACKEND_NUMBER - 1);
+  if (size == 1)
+    return 0;
 
-  __u32 target_ip = rips[random_index];
-  sk->user_ip4 = target_ip;
-  bpf_printk("LB: Selected index %u, IP: %pI4", random_index, &target_ip);
+  // Lemire's Fast Modulo
+  return ((__u64)random * (__u64)size) >> 32;
 }
 
 SEC("cgroup/connect4")
@@ -45,18 +46,17 @@ int load_balance(struct bpf_sock_addr *sk) {
 
   __be32 vip = sk->user_ip4;
 
-  bpf_printk("vip = %pI4", &vip);
+  // bpf_printk("vip = %pI4, port = %u", &vip, bpf_ntohl(sk->user_port));
 
   struct backends *node = bpf_map_lookup_elem(&ip_map, &vip);
   if (node == NULL) {
-    bpf_printk("node == NULL, pass");
     return PASS;
   }
 
   __u32 size = node->size;
-  __be32 *rips = node->rips;
+  struct endpoint *endpoints = node->endpoints;
 
-  // virtual ip exists, but no real ip, reject this.
+  // virtual ip exists but no real ip, reject this.
   if (size == 0) [[clang::unlikely]] {
     return DROP;
   }
@@ -65,7 +65,16 @@ int load_balance(struct bpf_sock_addr *sk) {
     size = MAX_BACKEND_NUMBER;
   }
 
-  load_banalce_impl(sk, size, rips);
+  __u32 index = get_bucket_index(size);
+  if (index >= MAX_BACKEND_NUMBER) [[clang::unlikely]] {
+    index = 0; // this should be unreachable
+  }
+
+  __u32 target_ip = endpoints[index].rip;
+  __u32 target_port = endpoints[index].ports;
+
+  sk->user_ip4 = target_ip;
+  sk->user_port = target_port;
 
   return PASS;
 }

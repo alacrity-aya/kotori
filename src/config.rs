@@ -51,7 +51,7 @@ pub struct HashConfig {
 #[derive(Debug, Deserialize)]
 pub struct RealIp {
     pub addr: net::IpAddr,
-    pub port: u16,
+    pub port: u32,
     #[serde(rename = "w", default = "default_weight")]
     pub weight: u32,
 }
